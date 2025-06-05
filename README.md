@@ -1,2 +1,2 @@
 # VoxelSplat
-CVPR 2025: VoxelSplat: Dynamic Gaussian Splatting as an Effective Loss for Occupancy and Flow Prediction
+Full code will be released by 2025.07.10.
