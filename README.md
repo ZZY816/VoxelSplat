@@ -7,5 +7,6 @@
 
 ![Framework Diagram](assets/framework.png)
 
-Full code will be released by 2025.07.10.
+⏳ Full code is under final preparation and will be released in the coming days. Thank you for your patience! ⏳
+
 
