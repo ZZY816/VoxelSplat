@@ -19,6 +19,7 @@ from mmdet.datasets import replace_ImageToTensor
 from mmdet.utils import get_root_logger as get_mmdet_root_logger
 from mmdet3d.models.fbbev.utils import CustomDistEvalHook
 
+
 def init_random_seed(seed=None, device='cuda'):
     """Initialize random seed.
 

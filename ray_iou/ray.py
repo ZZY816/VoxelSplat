@@ -206,7 +206,7 @@ def process_one_sample(sem_pred, lidar_rays, output_origin, flow_pred, return_xy
 
 def quick_save(results_dict, save_dir):
 
-    root = '/zhuziyue/zzy/GaussianOcc/data/nuscenes/bevdetv2-nuscenes_infos_val.pkl'
+    root = 'data/nuscenes/bevdetv2-nuscenes_infos_val.pkl'
     output_name = 'preds.gz'
     data_infos = pickle.load(open(root, 'rb'))['infos']
 
@@ -267,10 +267,10 @@ def quick_save(results_dict, save_dir):
         }
 
     submission_pkl_pred = {
-        'method': 'GaussianOcc',
-        'team': 'GaussianOcc',
-        'authors': ['GaussianOcc', ],
-        'e-mail': '2778933571@qq.com',
+        'method': 'VoxelSplat',
+        'team': 'VoxelSplat',
+        'authors': ['VoxelSplat', ],
+        'e-mail': 'zhuziyue@mail.nankai.edu.cn',
         'institution / company': "Me",
         'country / region': "China",
         'results': data_pkl_pred

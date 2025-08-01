@@ -3,11 +3,11 @@ from os import path as osp
 
 import mmcv
 import numpy as np
-from lyft_dataset_sdk.eval.detection.mAP_evaluation import (Box3D, get_ap,
-                                                            get_class_names,
-                                                            get_ious,
-                                                            group_by_key,
-                                                            wrap_in_box)
+# from lyft_dataset_sdk.eval.detection.mAP_evaluation import (Box3D, get_ap,
+#                                                             get_class_names,
+#                                                             get_ious,
+#                                                             group_by_key,
+#                                                             wrap_in_box)
 from mmcv.utils import print_log
 from terminaltables import AsciiTable
 

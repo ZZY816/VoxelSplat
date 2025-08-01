@@ -199,8 +199,8 @@ if __name__ == '__main__':
         version=get_version(),
         description=("OpenMMLab's next-generation platform"
                      'for general 3D object detection.'),
-        long_description=readme(),
-        long_description_content_type='text/markdown',
+        # long_description=readme(),
+        # long_description_content_type='text/markdown',
         author='MMDetection3D Contributors',
         author_email='zwwdev@gmail.com',
         keywords='computer vision, 3D object detection',
@@ -217,17 +217,7 @@ if __name__ == '__main__':
             'Programming Language :: Python :: 3.7',
         ],
         license='Apache License 2.0',
-        # install_requires=parse_requirements('requirements/runtime.txt'),
-        # extras_require={
-        #     'all': parse_requirements('requirements.txt'),
-        #     'tests': parse_requirements('requirements/tests.txt'),
-        #     'build': parse_requirements('requirements/build.txt'),
-        #     'optional': parse_requirements('requirements/optional.txt'),
-        #     'mim': parse_requirements('requirements/mminstall.txt'),
-        # },
-        # 不再安装任何 requirements，install_requires 设为空列表
         install_requires=[],
-        # 不扩展任何 extras
         extras_require={},
         ext_modules=[
             make_cuda_ext(

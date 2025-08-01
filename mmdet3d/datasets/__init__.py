@@ -9,28 +9,7 @@ from .custom_3d import Custom3DDataset
 # from .nuscenes_dataset import NuScenesDataset
 # from .nuscenes_mono_dataset import NuScenesMonoDataset
 from .nuscenes_occ_dataset import NuScenesOccDataset
-# yapf: disable
-# from .pipelines import (AffineResize, BackgroundPointsFilter, GlobalAlignment,
-#                         GlobalRotScaleTrans, IndoorPatchPointSample,
-#                         IndoorPointSample, LoadAnnotations3D,
-#                         LoadPointsFromDict, LoadPointsFromFile,
-#                         LoadPointsFromMultiSweeps, MultiViewWrapper,
-#                         NormalizePointsColor, ObjectNameFilter, ObjectNoise,
-#                         ObjectRangeFilter, ObjectSample, PointSample,
-#                         PointShuffle, PointsRangeFilter, RandomDropPointsColor,
-#                         RandomFlip3D, RandomJitterPoints, RandomRotate,
-#                         RandomShiftScale, RangeLimitedRandomCrop,
-#                         VoxelBasedPointSampler)
 
-# from .pipelines import (LoadAnnotations3D,
-#                         LoadPointsFromDict, LoadPointsFromFile,
-#                         LoadPointsFromMultiSweeps)
-# yapf: enable
-# from .s3dis_dataset import S3DISDataset, S3DISSegDataset
-# from .scannet_dataset import (ScanNetDataset, ScanNetInstanceSegDataset,
-#                               ScanNetSegDataset)
-# from .semantickitti_dataset import SemanticKITTIDataset
-# from .sunrgbd_dataset import SUNRGBDDataset
 from .utils import get_loading_pipeline
 # from .waymo_dataset import WaymoDataset
 from .samplers import InfiniteGroupEachSampleInBatchSampler

@@ -35,6 +35,40 @@ nusc_class_frequencies = np.array([
 nusc_class_frequencies = np.array([75432995, 25240097, 12970402, 10834080, 4911253, 313485, 425131, 4285461, 701594, 3848670, 384886109,
                   10222682, 123337011, 171792855, 315173113, 372498065, 16486326997])
 
+nusc_class_frequencies = np.array([
+    89275612,
+    30702871,
+    14707768,
+    13641797,
+    5860037,
+    388063,
+    543072,
+    5070078,
+    846475,
+    4671687,
+    468293495,
+    13572616,
+    151618193,
+    211187466,
+    382769006,
+    454647803,
+    20007563961
+ ])
+
+VELO_BINS  = np.array([0, 1, 2, 5, 10, np.inf])
+nusc_velo_frequencies = np.array([
+    21813410495,
+    6412527,
+    12202872,
+    18054418,
+    5279688
+ ])
+
+
+class_freq = torch.tensor(nusc_class_frequencies, dtype=torch.float32)
+velo_bins  = torch.tensor(VELO_BINS,              dtype=torch.float32)
+velo_freq  = torch.tensor(nusc_velo_frequencies, dtype=torch.float32)
+
 # nusc_class_frequencies = np.array([4992563, 301900, 4749134, 40784501, 3270178, 402736, 5792502, 1040733, 5995197,
 #                         13754976, 258417482, 7340707, 82964921, 113713395, 271945241, 284762437, 16890941722])
 

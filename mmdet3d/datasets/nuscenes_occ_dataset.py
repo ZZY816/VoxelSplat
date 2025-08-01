@@ -1,11 +1,3 @@
-# Copyright (c) 2022-2023, NVIDIA Corporation & Affiliates. All rights reserved. 
-# 
-# This work is made available under the Nvidia Source Code License-NC. 
-# To view a copy of this license, visit 
-# https://github.com/NVlabs/FB-BEV/blob/main/LICENSE
-
-
-# Copyright (c) OpenMMLab. All rights reserved.
 import tempfile
 from os import path as osp
 import os
@@ -14,15 +6,11 @@ import numpy as np
 import pyquaternion
 from nuscenes.utils.data_classes import Box as NuScenesBox
 
-import ray_iou.ray
 from .utils import nuscenes_get_rt_matrix, get_sensor_transforms, downsample_intrinsic
-# from ..core import show_result
-# from ..core.bbox import Box3DMode, Coord3DMode, LiDARInstance3DBoxes
 from .builder import DATASETS
 from .custom_3d import Custom3DDataset
 from .pipelines import Compose
 from tqdm import tqdm
-import csv
 import math
 import torch
 
@@ -158,87 +146,6 @@ class NuScenesOccDataset(Custom3DDataset):
                 assert len(np.bincount(new_flags)) == len(np.bincount(self.flag)) * self.sequences_split_num
                 self.flag = np.array(new_flags, dtype=np.int64)
 
-    def get_gaussian_label_v1(self, index, img_size=[900, 1600], ds_rate=4):
-        img_size = np.array(img_size) // ds_rate
-        info = self.data_infos[index]
-
-        sensor2egos = []
-        ego2globals = []
-        intrins = []
-
-        label_depths = []
-        label_segs = []
-        label_flows = []
-        time_ids = {}
-        idx = 0
-
-        def set_gaussian_label(anno_dict, size=None):
-            semantics, depth, flow = anno_dict['pcd_cls'], anno_dict['pcd_dist'], anno_dict['pcd_flow']
-            assert semantics[depth < 60].max() < 16
-            fH, fW = size[0], size[1]
-            semantics = semantics.reshape(fH, fW)
-            depth = depth.reshape(fH, fW).astype(np.float32)
-            flow = flow.reshape(fH, fW, 2).astype(np.float32)
-
-            return semantics, depth, flow
-
-        #aux_frames = self.aux_frames
-        aux_frames = []
-        for time_id in [0] + aux_frames:
-            time_ids[time_id] = []
-            select_id = max(index + time_id, 0)
-            if select_id >= len(self.data_infos) or self.data_infos[select_id]['scene_name'] != info['scene_name']:
-                select_id = index  # out of sequence
-            info = self.data_infos[select_id]
-
-            gaussian_labels = np.load(os.path.join(self.gaussian_label_path, info['scene_name'], info['token'],
-                                           'labels_2d.npz'), allow_pickle=True)
-
-            for cam_name in self.cam_names:
-                intrin = torch.Tensor(info['cams'][cam_name]['cam_intrinsic'])
-                sensor2ego, ego2global = get_sensor_transforms(info, cam_name)
-
-                # load seg/depth/flow GT of 2D
-                label_seg, label_depth, label_flow = set_gaussian_label(gaussian_labels[cam_name].item(), size=img_size)
-
-                sensor2egos.append(sensor2ego)
-                ego2globals.append(ego2global)
-                intrins.append(intrin)
-
-                label_depths.append(torch.Tensor(label_depth))
-                label_segs.append(torch.Tensor(label_seg))
-                label_flows.append(torch.Tensor(label_flow))
-                time_ids[time_id].append(idx)
-                idx += 1
-
-        T, N = len(aux_frames) + 1, len(info['cams'].keys())
-
-        intrins = torch.stack(intrins)
-        label_depths = torch.stack(label_depths)
-        label_segs = torch.stack(label_segs)
-        label_flows = torch.stack(label_flows)
-
-        sensor2egos = torch.stack(sensor2egos)
-        ego2globals = torch.stack(ego2globals)
-
-        sensor2egos = sensor2egos.view(T, N, 4, 4)
-        ego2globals = ego2globals.view(T, N, 4, 4)
-        intrins = intrins.view(T, N, 3, 3)
-
-        label_depths = label_depths.view(T, N, img_size[0], img_size[1])
-        label_segs = label_segs.view(T, N, img_size[0], img_size[1])
-        label_flows = label_flows.view(T, N, img_size[0], img_size[1], 2)
-
-        # calculate the transformation from adjacent_sensor to key_ego
-        keyego2global = ego2globals[0, :, ...].unsqueeze(0)
-        global2keyego = torch.inverse(keyego2global.double())
-        sensor2keyegos = global2keyego @ ego2globals.double() @ sensor2egos.double()
-        sensor2keyegos = sensor2keyegos.float()
-
-        intrins = downsample_intrinsic(intrins, downsampling_factor=ds_rate)
-
-        return (sensor2keyegos, intrins, label_segs, label_depths, label_flows)
-
     def get_gaussian_label(self, index, img_size=[900, 1600], ds_rate=4):
         img_size = np.array(img_size) // ds_rate
         info = self.data_infos[index]
@@ -326,10 +233,7 @@ class NuScenesOccDataset(Custom3DDataset):
         #     input_dict['ann_infos'] = info['ann_infos']
 
         if self.gaussian_label_path is not None:
-            if self.load_2d_label:
-                input_dict['gaussian_labels_v1'] = self.get_gaussian_label_v1(index)
-            else:
-                input_dict['gaussian_labels'] = self.get_gaussian_label(index)
+            input_dict['gaussian_labels'] = self.get_gaussian_label(index)
 
         if self.modality['use_camera']:
             if self.img_info_prototype == 'mmcv':
@@ -517,7 +421,6 @@ class NuScenesOccDataset(Custom3DDataset):
         mmcv.dump(nusc_submissions, res_path)
         return res_path
 
-
     def evaluate(self, results,
                        logger=None,
                         metric='bbox',
@@ -583,7 +486,7 @@ class NuScenesOccDataset(Custom3DDataset):
             quick_save(results_dict=results_dict, save_dir=show_dir)
 
         print('done')
-      
+        exit()
 
     def evaluate_occupancy_miou(self, occ_results, runner=None, show_dir=None, save=False, **eval_kwargs):
         from .occ_metrics import Metric_mIoU, Metric_FScore, Metric_mIoU_SurroundOcc

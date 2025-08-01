@@ -123,25 +123,6 @@ def compute(args):
     openocc_occ_score = openocc_miou * 0.9 + max(1 - openocc_mave, 0.0) * 0.1
 
 
-    # if not (len(gt_token_list) == len(openocc_ave_list) == len(openocc_iou_list)):
-    #     raise ValueError("所有列表的长度必须相同")
-    #
-    # # 指定要保存的 CSV 文件名
-    # csv_file_name = 'output.csv'
-    #
-    # # 打开 CSV 文件进行写入
-    # with open(csv_file_name, mode='w', newline='', encoding='utf-8') as csv_file:
-    #     csv_writer = csv.writer(csv_file)
-    #
-    #     # 写入表头（可选）
-    #     csv_writer.writerow(['gt_token', 'openocc_ave', 'openocc_iou'])
-    #
-    #     # 写入数据行
-    #     for gt_token, openocc_ave, openocc_iou in zip(gt_token_list, openocc_ave_list, openocc_iou_list):
-    #         csv_writer.writerow([gt_token, openocc_ave, openocc_iou])
-    #
-    # print(f"数据已成功保存到 {csv_file_name}")
-    # final score
     occ_score = openocc_occ_score
 
     output = {

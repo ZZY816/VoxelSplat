@@ -1,9 +1,3 @@
-# Copyright (c) 2022-2023, NVIDIA Corporation & Affiliates. All rights reserved. 
-# 
-# This work is made available under the Nvidia Source Code License-NC. 
-# To view a copy of this license, visit 
-# https://github.com/NVlabs/FB-BEV/blob/main/LICENSE
-
 import torch
 import torch.nn.functional as F
 import torch.nn as nn
@@ -464,12 +458,6 @@ class FBOCC(BaseDetector):
             points, img=img_inputs, img_metas=img_metas, **kwargs)
         losses = dict()
 
-        # if  self.with_pts_bbox:
-        #     losses_pts = self.forward_pts_train(results['img_bev_feat'], gt_bboxes_3d,
-        #                                     gt_labels_3d, img_metas,
-        #                                     gt_bboxes_ignore)
-        #     losses.update(losses_pts)
-
         if self.with_specific_component('occupancy_head'):
             if self.do_history:
                 flow_loss_weight = self.flow_loss_weight
@@ -500,9 +488,6 @@ class FBOCC(BaseDetector):
                                                                  gt_flow=kwargs['flow'], flow_loss_weight=flow_loss_weight)
             losses.update(losses_flow)
 
-        # if self.with_specific_component('frpn'):
-        #     losses_mask = self.frpn.get_bev_mask_loss(kwargs['gt_bev_mask'], results['bev_mask_logit'])
-        #     losses.update(losses_mask)
 
         if self.use_depth_supervision and self.with_specific_component('depth_net'):
             loss_depth = self.depth_net.get_depth_loss(kwargs['gt_depth'], results['depth'])
@@ -541,10 +526,9 @@ class FBOCC(BaseDetector):
                     'num of augmentations ({}) != num of image meta ({})'.format(
                         len(img_inputs), len(img_metas)))
 
-            # print(len(img_metas), img_metas)
-            # exit()
+             
             if num_augs==1 and not img_metas[0][0].get('tta_config', dict(dist_tta=False))['dist_tta']:
-                return self.simple_test(points[0], img_metas[0], img_inputs[0],
+                return self.simple_test(points, img_metas[0], img_inputs[0],
                                     **kwargs)
             else:
                 return self.aug_test(points, img_metas, img_inputs, **kwargs)
@@ -577,11 +561,8 @@ class FBOCC(BaseDetector):
             points, img=img, img_metas=img_metas, **kwargs)
 
         bbox_list = [dict() for _ in range(len(img_metas))]
-        
-        if  self.with_pts_bbox:
-            bbox_pts = self.simple_test_pts(results['img_bev_feat'], img_metas, rescale=rescale)
-        else:
-            bbox_pts = [None for _ in range(len(img_metas))]
+          
+        bbox_pts = [None for _ in range(len(img_metas))]
 
         if self.with_specific_component('occupancy_flow_head'):
             pred_flow = self.occupancy_flow_head(results['img_bev_feat'], results=results, **kwargs)['output_flow'][0]
@@ -598,31 +579,7 @@ class FBOCC(BaseDetector):
 
         if self.with_specific_component('occupancy_head'):
             out = self.occupancy_head(results['img_bev_feat'], results=results, **kwargs)
-            # if 'gaussian_labels' in kwargs:
-            #     gt_gaussian, gt_occupancy = kwargs['gaussian_labels'],  kwargs['gt_occupancy']
-            #
-            #     render_results = self.occupancy_head.gaussian_render(out['output_gaussian'][0], out['output_voxels'][0],
-            #                                           out['output_flow'][0], gt_gaussian[0], gt_occupancy[0])
-            #
-            #     depths_2d = render_results[0]['depths'].squeeze(0).squeeze(0).squeeze(-1).cpu().numpy()
-            #     semantics_2d = render_results[0]['semantics'].squeeze(0).squeeze(0).argmax(-1).cpu().numpy()
-            #     #print(semantics_2d.shape, depths_2d.shape, semantics_2d.max(), depths_2d.max())
-            #     # semantic.tofile('/zhuziyue/zzy/GaussianOcc/visual/semantic_maps.bin')
-            #     #
-            #     # depth.tofile('/zhuziyue/zzy/GaussianOcc/visual/depth_maps.bin')
-            #
-            #     # gt = gt_gaussian[0][-2][0][0].cpu().numpy()
-            #     # gt.tofile('/zhuziyue/zzy/GaussianOcc/visual/depth_maps_gt.bin')
-            #     #
-            #     # gt_s = gt_gaussian[0][-3][0][0].cpu().numpy()
-            #     #
-            #     # gt_s.tofile('/zhuziyue/zzy/GaussianOcc/visual/semantic_maps_gt.bin')
-            #     # print(gt_s.shape)
-            #     # print('suc')
-            #     # exit()
-            # else:
-            #     depth = None
-            #     semantic = None
+            
             depth = None
             semantic = None
 
@@ -674,7 +631,7 @@ class FBOCC(BaseDetector):
 
         else:
             pred_occupancy_category =  None
-
+        
         if results.get('bev_mask_logit', None) is not None:
             pred_bev_mask = results['bev_mask_logit'].sigmoid() > 0.5
             iou = IOU(pred_bev_mask.reshape(1, -1), kwargs['gt_bev_mask'][0].reshape(1, -1)).cpu().numpy()

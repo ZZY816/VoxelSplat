@@ -1,1 +1,2 @@
 from .gaussian_head_gsplat import GaussianHead_Gsplat
+from .gaussian_head import GaussianHead

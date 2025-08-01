@@ -1,10 +1,3 @@
-# Copyright (c) 2022-2023, NVIDIA Corporation & Affiliates. All rights reserved. 
-# 
-# This work is made available under the Nvidia Source Code License-NC. 
-# To view a copy of this license, visit 
-# https://github.com/NVlabs/FB-BEV/blob/main/LICENSE
-
-
 import numpy as np
 import torch
 import torch.nn as nn
@@ -226,13 +219,13 @@ class OccFlowHead(BaseModule):
     @force_fp32()
     def forward_train(self, voxel_feats, img_feats=None, pts_feats=None, transform=None,
                       gt_occupancy=None, gt_flow=None, gt_gaussian=None, flow_loss_weight=None, **kwargs):
-
+        
         res = self.forward(voxel_feats, img_feats=img_feats, pts_feats=pts_feats, transform=transform, **kwargs)
 
         if self.gaussian_render is not None:
             #render_results = None
             render_results = self.gaussian_render(res['output_voxels'][0],
-                                            res['output_flow'][0], gt_gaussian, gt_occupancy, gt_flow)
+                                            res['output_flow'][0], gt_gaussian, gt_occupancy, gt_flow, flow_loss_weight=flow_loss_weight)
         else:
             render_results = None
 

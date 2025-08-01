@@ -11,7 +11,7 @@ from mmdet.models.builder import LOSSES as MMDET_LOSSES
 from mmdet.models.builder import NECKS as MMDET_NECKS
 from mmdet.models.builder import ROI_EXTRACTORS as MMDET_ROI_EXTRACTORS
 from mmdet.models.builder import SHARED_HEADS as MMDET_SHARED_HEADS
-from mmseg.models.builder import LOSSES as MMSEG_LOSSES
+# from mmseg.models.builder import LOSSES as MMSEG_LOSSES
 
 MODELS = Registry('models', parent=MMCV_MODELS)
 

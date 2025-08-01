@@ -228,24 +228,6 @@ model = dict(
         out_channels=voxel_out_channel,
         norm_cfg=dict(type='SyncBN', requires_grad=True),
     ),
-    # occupancy_head=dict(
-    #     type='OccHead',
-    #     with_cp=use_checkpoint,
-    #     use_focal_loss=True,
-    #     norm_cfg=dict(type='SyncBN', requires_grad=True),
-    #     soft_weights=True,
-    #     final_occ_size=occ_size,
-    #     empty_idx=empty_idx,
-    #     num_level=len(voxel_out_indices),
-    #     in_channels=[voxel_out_channel] * len(voxel_out_indices),
-    #     out_channel=num_cls,
-    #     point_cloud_range=point_cloud_range,
-    #     loss_weight_cfg=dict(
-    #         loss_voxel_ce_weight=1.0,
-    #         loss_voxel_sem_scal_weight=1.0,
-    #         loss_voxel_geo_scal_weight=1.0,
-    #         loss_voxel_lovasz_weight=1.0,
-    #     ),
     occupancy_head=dict(
         type='OccFlowHead',
         with_cp=use_checkpoint,
@@ -266,19 +248,20 @@ model = dict(
             loss_voxel_geo_scal_weight=1.0,
             loss_voxel_lovasz_weight=1.0,
         ),
-        gaussian_head=dict(
-                type='GaussianHead_Gsplat',
-                loss_sem=dict(type='CrossEntropyLoss',
-                            use_sigmoid=False,
-                            loss_weight=0.5),
-                use_depth_loss=True,
-                gaussian_cfg=dict(
-                in_channels=gau_channel,
-                max_size=0.12),
-                loss_weight_cfg=dict(
-                    loss_sem_weight=1.0,
-                    loss_depth_weight=1.0,
-                        ),),
+        # gaussian_head=dict(
+        #         type='GaussianHead',
+        #         loss_sem=dict(type='CrossEntropyLoss',
+        #                     use_sigmoid=False,
+        #                     loss_weight=0.5),
+        #         render_future=[True, False],
+        #         use_depth_loss=True,
+        #         gaussian_cfg=dict(
+        #         in_channels=gau_channel,
+        #         max_size=0.12),
+        #         loss_weight_cfg=dict(
+        #             loss_sem_weight=1.0,
+        #             loss_depth_weight=1.0,
+        #                 ),),
     ),
     pts_bbox_head=None)
 
@@ -287,7 +270,7 @@ dataset_type = 'NuScenesOccDataset'
 data_root = 'data/nuscenes/'
 file_client_args = dict(backend='disk')
 occupancy_path = 'data/nuscenes/gts'
-gaussian_label_path = 'data/nuscenes/openocc_gt2d'
+gaussian_label_path = 'data/nuscenes/openocc_gt2d' # not use
 
 train_pipeline = [
     dict(
@@ -311,11 +294,6 @@ train_pipeline = [
     dict(
         type='Collect3D', keys=['img_inputs', 'gt_occupancy', 'gt_depth', 'flow',
                                 'gaussian_labels'])
-    # dict(type='LoadOccupancy', ignore_nonvisible=False, fix_void=fix_void, occupancy_path=occupancy_path),
-    # dict(type='DefaultFormatBundle3D', class_names=class_names),
-#     dict(
-#         type='Collect3D', keys=['img_inputs', 'gt_occupancy', 'gt_depth', 'flow'
-#                                 ])
 ]
 
 test_pipeline = [
@@ -393,13 +371,7 @@ for key in ['val', 'test']:
 
 # Optimizer
 lr = 2e-4
-optimizer = dict(
-    type='AdamW', lr=lr, weight_decay=1e-2,
-    paramwise_cfg=dict(
-        custom_keys={
-            'img_backbone': dict(lr_mult=0.1)}
-    )
-)
+optimizer = dict(type='AdamW', lr=lr, weight_decay=1e-2)
 
 optimizer_config = dict(grad_clip=dict(max_norm=5, norm_type=2))
 lr_config = dict(

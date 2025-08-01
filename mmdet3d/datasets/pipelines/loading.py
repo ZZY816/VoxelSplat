@@ -15,7 +15,7 @@ import os
 from torchvision.transforms.functional import rotate
 from scipy.ndimage import rotate as scipy_rotate
 import math
-
+from mmdet3d.models.fbbev.modules.occ_loss_utils import class_freq, velo_freq, velo_bins
 
 
 @PIPELINES.register_module()
@@ -141,10 +141,6 @@ class LoadImageFromFileMono3D(object):
 
 
 
-
-
-import torch.nn as nn
-
 @PIPELINES.register_module()
 class LoadOccupancy(object):
     """Load an image from file in monocular 3D object detection. Compared to 2D
@@ -191,37 +187,62 @@ class LoadOccupancy(object):
 
         return rotate_flow
 
-    def generate_sample_mask(self, tensor, num_samples=None, ignore_value=None, exp=None):
 
-        valid_mask = tensor != ignore_value  # 创建忽略255的掩码
-        valid_values = tensor[valid_mask]  # 提取有效值
+    def generate_sample_mask_global(self,
+        occ: torch.LongTensor,          # [H, W] or [B, H, W] tensor of semantic class labels
+        flow: torch.FloatTensor,        # same spatial dims with last dim 2: optical flow vectors
+        class_freq: torch.Tensor,       # shape [17], global frequency counts for each class
+        velo_freq: torch.Tensor,        # shape [len(velo_bins)-1], global counts for each speed bin
+        velo_bins: torch.Tensor,        # e.g. tensor([0, 1, 2, 5, 10, inf])
+        num_samples: int,               # total number of pixels to sample
+        ignore_value: int = 255,        # label value to ignore
+        alpha: float = 0.5,             # exponent for class frequency weighting
+        beta: float = 0.5,              # exponent for velocity frequency weighting
+        eps: float = 1e-6,              # small constant to avoid division by zero
+    ):
+        """
+        Generate a boolean mask of shape occ.shape, sampling pixels according
+        to global class and velocity inverse-frequency weights.
+        """
+        device = occ.device
 
-        unique_labels, counts = torch.unique(valid_values, return_counts=True)
+        # 1. Compute inverse-frequency weights for classes and velocity bins
+        #    w_cls[i] ∝ 1 / (class_freq[i]^alpha + eps)
+        w_cls = 1.0 / (class_freq.float().pow(alpha) + eps)
+        w_cls = w_cls / w_cls.sum()  # normalize to sum to 1
 
-        # 计算每个类别的采样概率（低频类别有更高概率）
+        #    w_velo[j] ∝ 1 / (velo_freq[j]^beta + eps)
+        w_velo = 1.0 / (velo_freq.float().pow(beta) + eps)
+        w_velo = w_velo / w_velo.sum()  # normalize
 
-        probabilities = torch.zeros_like(counts).float()
-        probabilities[:-1] = 1.0 / (torch.pow(counts[:-1].float(), exp) + 1) # 频率少的类别分配更高概率
-        probabilities[-1] = 1.0 / (torch.pow(counts[-1].float(),  exp) + 1)  # 频率少的类别分配更高概率
-        probabilities /= probabilities.sum()  # 归一化
-        # print(unique_labels, probabilities)
-        # exit()
-        # 将类别标签映射到采样概率
-        label_to_prob = {label.item(): prob.item() for label, prob in zip(unique_labels, probabilities)}
+        # 2. Compute per-pixel speed magnitude and assign to velocity bins
+        #    flow has shape [..., 2], so take L2 norm along last dim
+        speed = torch.norm(flow, dim=-1)  # shape [...], same spatial dims as occ
+        #    torch.bucketize returns indices in [1, len(velo_bins)-1], so subtract 1
+        bin_idx = torch.bucketize(speed, velo_bins[:-1].to(device)) - 1
 
-        # 根据类别生成每个位置的概率分布，忽略255
-        prob_tensor = tensor.clone().float().apply_(lambda x: label_to_prob[x] if x != ignore_value else 0.0)
+        # 3. Lookup class weight and velocity weight per pixel
+        #    Index w_cls by occ, clamping labels into [0, num_classes-1]
+        cls_w = w_cls[occ.clamp(0, w_cls.size(0) - 1)]
+        velo_w = w_velo[bin_idx]
 
-        # 将 tensor 拉平成一维
-        flat_probs = prob_tensor.flatten()
-        flat_indices = torch.multinomial(flat_probs, num_samples, replacement=False)
+        #    Zero out weights at ignore_value pixels
+        cls_w = torch.where(occ == ignore_value, 0.0, cls_w)
+        velo_w = torch.where(occ == ignore_value, 0.0, velo_w)
 
-        # 生成布尔掩码
-        mask = torch.zeros_like(flat_probs, dtype=torch.bool)
-        mask[flat_indices] = True
+        # 4. Combine weights and normalize to form sampling probabilities
+        pixel_w = cls_w * velo_w
+        
+        flat_w = pixel_w.contiguous().view(-1)
+        probs = flat_w / (flat_w.sum() + eps)
 
-        # 重新reshape为原始形状
-        mask = mask.view(tensor.shape)
+        # 5. Sample indices without replacement according to probs
+        sampled_idx = torch.multinomial(probs, num_samples, replacement=False)
+
+        # 6. Build boolean mask and reshape
+        mask_flat = torch.zeros_like(flat_w, dtype=torch.bool)
+        mask_flat[sampled_idx] = True
+        mask = mask_flat.contiguous().view(occ.shape)
 
         return mask
 
@@ -306,47 +327,8 @@ class LoadOccupancy(object):
 
         results['flow'] = flow
         results['gt_occupancy'] = occupancy
-
-        if 'gaussian_labels_v1' in results:
-            gaussian_labels = list(results['gaussian_labels_v1'])
-
-            if results['rotate_bda'] != 0:
-                theta = math.radians(results['rotate_bda'])
-                cos_theta = math.cos(theta)
-                sin_theta = math.sin(theta)
-
-                R_z = torch.tensor([
-                    [cos_theta, -sin_theta, 0, 0],
-                    [sin_theta, cos_theta, 0, 0],
-                    [0, 0, 1, 0],
-                    [0, 0, 0, 1]
-                ]).reshape(1, 1, 4, 4)
-                gaussian_labels[0] = R_z @ gaussian_labels[0]
-                gaussian_labels[-1] = self.rotate_flow(gaussian_labels[-1], results['rotate_bda'])
-
-            if results['flip_dx']:
-                flip_x = torch.tensor([
-                    [-1., 0, 0, 0],
-                    [0, 1., 0, 0],
-                    [0, 0, 1., 0],
-                    [0, 0, 0, 1.]
-                ]).reshape(1, 1, 4, 4)
-                gaussian_labels[0] = flip_x @ gaussian_labels[0]
-                gaussian_labels[-1][..., 0] = - gaussian_labels[-1][..., 0]
-
-            if results['flip_dy']:
-                flip_y = torch.tensor([
-                    [1., 0, 0, 0],
-                    [0, -1., 0, 0],
-                    [0, 0, 1., 0],
-                    [0, 0, 0, 1.]
-                ]).reshape(1, 1, 4, 4)
-                gaussian_labels[0] = flip_y @ gaussian_labels[0]
-                gaussian_labels[-1][..., 1] = - gaussian_labels[-1][..., 1]
-
-            results['gaussian_labels'] = tuple(gaussian_labels)
-
-        elif 'gaussian_labels' in results:
+         
+        if 'gaussian_labels' in results:
             gaussian_labels = list(results['gaussian_labels'])
 
             if results['rotate_bda'] != 0:
@@ -388,10 +370,15 @@ class LoadOccupancy(object):
 
                 else:
                     target = occupancy
-                gaussian_labels[-1] = self.generate_sample_mask(target, num_samples=self.sample_num,
-                                                                ignore_value=255, exp=self.exp)
+              
+                gaussian_labels[-1] = self.generate_sample_mask_global(occ=target.long(),
+                            flow=flow,         
+                            class_freq=class_freq,       
+                            velo_freq=velo_freq,        # shape [len(velo_bins)-1], global counts for each speed bin
+                            velo_bins=velo_bins,        # e.g. tensor([0, 1, 2, 5, 10, inf])
+                            num_samples=self.sample_num,               # total number of pixels to sample
+                        )
 
-            #print(results['rotate_bda'], gaussian_labels[-1].min(), gaussian_labels[-1].max(), flow.min(), flow.max())
 
             results['gaussian_labels'] = tuple(gaussian_labels)
 
@@ -399,76 +386,7 @@ class LoadOccupancy(object):
        
         return results
 
-    # def __call__(self, results):
-    #     """Call functions to load image and get image meta information.
-    #
-    #     Args:
-    #         results (dict): Result dict from :obj:`mmdet.CustomDataset`.
-    #
-    #     Returns:
-    #         dict: The dict contains loaded image and meta information.
-    #     """
-    #
-    #     scene_name = results['curr']['scene_name']
-    #     sample_token = results['curr']['token']
-    #
-    #     occupancy_file_path = osp.join(self.occupancy_path, scene_name, sample_token, 'labels.npz')
-    #     data = np.load(occupancy_file_path)
-    #     occupancy = torch.tensor(data['semantics'])
-    #     flow = torch.tensor(data['flow'])
-    #
-    #     # to BEVDet format
-    #     occupancy = occupancy.permute(2, 0, 1) # D H W
-    #     occupancy = torch.rot90(occupancy, 1, [1, 2])
-    #     occupancy = torch.flip(occupancy, [1])
-    #     occupancy = occupancy.permute(1, 2, 0) # H, W, D
-    #
-    #     if self.fix_void:
-    #         occupancy[occupancy<255] = occupancy[occupancy<255] + 1
-    #
-    #     for class_ in self.ignore_classes:
-    #         occupancy[occupancy==class_] = 255
-    #
-    #     if results['rotate_bda'] != 0:
-    #         occupancy = occupancy.permute(2, 0, 1)
-    #         occupancy = rotate(occupancy, -results['rotate_bda'], fill=255).permute(1, 2, 0)
-    #
-    #     if results['flip_dx']:
-    #         occupancy = torch.flip(occupancy, [1])
-    #
-    #     if results['flip_dy']:
-    #         occupancy = torch.flip(occupancy, [0])
-    #
-    #     flow = flow.permute(2, 0, 1, 3)
-    #     flow = torch.rot90(flow, 1, [1, 2])
-    #     flow = self.rotate_flow(flow, 90)
-    #     flow = torch.flip(flow, [1])
-    #     flow[..., 0] = - flow[..., 0]
-    #     flow = flow.permute(1, 2, 0, 3)
-    #
-    #     if results['rotate_bda'] != 0:
-    #         H, W, D, C = flow.shape
-    #         flow = flow.reshape(H, W, -1).permute(2, 0, 1)
-    #         flow = rotate(flow, -results['rotate_bda'], fill=0).permute(1, 2, 0).reshape(H, W, D, C)
-    #         flow = self.rotate_flow(flow, -results['rotate_bda'])
-    #
-    #     if results['flip_dx']:
-    #         flow = torch.flip(flow, [1])
-    #         flow[..., 1] = - flow[..., 1]
-    #
-    #     if results['flip_dy']:
-    #         flow = torch.flip(flow, [0])
-    #         flow[..., 0] = - flow[..., 0]
-    #
-    #     if self.soft_flow:
-    #         flow = flow * 0.5
-    #
-    #     results['flow'] = torch.flip(flow, dims=[-1])
-    #     results['gt_occupancy'] = occupancy
-    #
-    #     results['visible_mask_bev'] = (occupancy==255).sum(-1)
-    #
-    #     return results
+
 
 
 @PIPELINES.register_module()

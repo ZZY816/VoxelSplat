@@ -19,6 +19,7 @@ __pycache__/
 *.log
 *.json
 *.csv
+*.gz
 ckpts
 work_dirs
 nuscenes-mini
@@ -172,3 +173,4 @@ data/sunrgbd/OFFICIAL_SUNRGBD/
 
 # Waymo evaluation
 mmdet3d/core/evaluation/waymo_utils/compute_detection_metrics_main
+ray_iou/output/my_gts.gz

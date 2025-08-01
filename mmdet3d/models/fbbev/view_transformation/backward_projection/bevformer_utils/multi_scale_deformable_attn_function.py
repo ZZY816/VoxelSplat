@@ -1,8 +1,4 @@
-# ---------------------------------------------
-# Copyright (c) OpenMMLab. All rights reserved.
-# ---------------------------------------------
-#  Modified by Zhiqi Li
-# ---------------------------------------------
+
 
 import torch
 from torch.cuda.amp import custom_bwd, custom_fwd
